@@ -1,0 +1,43 @@
+name: CI
+on:
+  push:
+    branches: [main]
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+    container:
+      image: maxxing/compiler-dev
+      # volumes:
+      #   - my_docker_volume:/volume_mount
+      # env:
+      #   RUSTUP_HOME: /root/.rustup
+      # GITHUB_WORKSPACE: /root/compiler
+    steps:
+      - uses: actions/checkout@v4
+
+      # 我想要更好的 rustup！
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - run: |
+          cp -a /root/. ~
+          unset RUSTUP_UPDATE_ROOT
+          unset RUSTUP_DIST_SERVER
+          rustup update
+          rustup default stable
+          autotest -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
+          grep -q "PASSED" autotest.log
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: autotest.log
+          path: autotest.log

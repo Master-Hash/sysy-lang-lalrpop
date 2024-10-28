@@ -16,10 +16,16 @@ lalrpop_mod!(sysy);
 fn main() -> Result<()> {
     // 解析命令行参数
     let mut args = args();
+
+    // 此为可执行文件名
     args.next();
+
     let mode = args.next().unwrap();
     let input = args.next().unwrap();
+
+    // 永远为 -o
     args.next();
+
     let output = args.next().unwrap();
 
     // 读取输入文件
@@ -50,8 +56,11 @@ fn main() -> Result<()> {
         .basic_block(Some("%entry".into()));
     main_data.layout_mut().bbs_mut().extend([entry]);
 
-    let zero = main_data.dfg_mut().new_value().integer(0);
-    let ret = main_data.dfg_mut().new_value().ret(Some(zero));
+    let v = main_data
+        .dfg_mut()
+        .new_value()
+        .integer(ast.func_def.block.stmt.num);
+    let ret = main_data.dfg_mut().new_value().ret(Some(v));
     main_data
         .layout_mut()
         .bb_mut(entry)
@@ -66,6 +75,22 @@ fn main() -> Result<()> {
     gen.generate_on(&program).unwrap();
     let text_form_ir = std::str::from_utf8(&gen.writer()).unwrap().to_string();
     println!("{}", text_form_ir);
+
+    // 输出到文件
+    match mode.as_str() {
+        "-koopa" => {
+            std::fs::write(output, text_form_ir)?;
+        }
+        "-riscv" => {
+            panic!("RISC-V backend not implemented");
+        }
+        "-perf" => {
+            panic!("Performance analysis not implemented");
+        }
+        _ => {
+            panic!("Invalid mode");
+        }
+    }
 
     Ok(())
 }

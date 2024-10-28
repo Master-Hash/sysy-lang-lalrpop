@@ -15,7 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 我想要更好的 rustup！
+      - name: Get rustc version
+        run: echo "rustc-version=$(rustc --version)" >> "${GITHUB_OUTPUT}"
+        id: get-version
 
       - uses: actions/cache@v4
         with:
@@ -25,7 +27,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.get-version.outputs.rustc-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Level 1 test
         run: |

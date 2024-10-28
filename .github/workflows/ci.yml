@@ -27,14 +27,16 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - run: |
+      - name: Level 1 test
+        run: |
           cp -a /root/. ~
+          rm ~/.cargo/config
           unset RUSTUP_UPDATE_ROOT
           unset RUSTUP_DIST_SERVER
           rustup update
           rustup default stable
-          autotest -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
-          grep -q "PASSED" autotest.log
+          autotest -w ${GITHUB_WORKSPACE}/target -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
+          tail -n1 autotest.log | grep -q "PASSED"
 
       - uses: actions/upload-artifact@v4
         continue-on-error: true

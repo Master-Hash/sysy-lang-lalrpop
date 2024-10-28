@@ -6,7 +6,7 @@ jobs:
   CI:
     runs-on: ubuntu-latest
     container:
-      image: maxxing/compiler-dev
+      image: xecades/compiler-dev
       # volumes:
       #   - my_docker_volume:/volume_mount
       # env:
@@ -29,12 +29,6 @@ jobs:
 
       - name: Level 1 test
         run: |
-          cp -a /root/. ~
-          rm ~/.cargo/config
-          unset RUSTUP_UPDATE_ROOT
-          unset RUSTUP_DIST_SERVER
-          rustup update
-          rustup default stable
           autotest -w ${GITHUB_WORKSPACE}/target -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
           tail -n1 autotest.log | grep -q "PASSED"
 

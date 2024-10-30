@@ -1,6 +1,8 @@
 mod ast;
+// mod codegen;
 mod ir;
 use koopa::back::KoopaGenerator;
+use koopa::ir::ValueKind;
 use lalrpop_util::lalrpop_mod;
 use std::env::args;
 use std::fs::read_to_string;
@@ -50,7 +52,43 @@ fn main() -> Result<()> {
             std::fs::write(output, text_form_ir)?;
         }
         "-riscv" => {
-            panic!("RISC-V backend not implemented");
+            let mut res = "  .text\n".to_string();
+            for &func in program.func_layout() {
+                let func_data = program.func(func);
+                match func_data.name() {
+                    "@main" => res.push_str("  .globl main\nmain:\n"),
+                    _ => panic!(),
+                }
+                // 遍历基本块列表
+                for (&bb, node) in func_data.layout().bbs() {
+                    // 一些必要的处理
+                    // ...
+                    // 遍历指令列表
+                    for &inst in node.insts().keys() {
+                        let value_data = func_data.dfg().value(inst);
+                        match value_data.kind() {
+                            ValueKind::Return(ret) => {
+                                println!("{:?}", value_data);
+                                let fuck = ret.value().unwrap();
+                                match func_data.dfg().value(fuck).kind() {
+                                    ValueKind::Integer(shit) => {
+                                        res.push_str(&format!(
+                                            "  li a0, {}\n  ret\n",
+                                            &shit.value()
+                                        ));
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                        // 访问指令
+                        // ...
+                    }
+                }
+            }
+            println!("{}", &res);
+            // panic!("RISC-V backend not implemented");
         }
         "-perf" => {
             panic!("Performance analysis not implemented");

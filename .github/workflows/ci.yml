@@ -26,14 +26,14 @@ jobs:
 
       - name: Level 1 test
         run: |
-          autotest -w ${GITHUB_WORKSPACE}/target -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest-lv1-koopa.log
+          autotest -w ${GITHUB_WORKSPACE}/target -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
           tail -n1 autotest.log | grep -q "PASSED"
 
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
           name: autotest-lv1-koopa.log
-          path: autotest-lv1-koopa.log
+          path: autotest.log
 
   lv1-riscv:
     runs-on: ubuntu-latest
@@ -59,11 +59,11 @@ jobs:
 
       - name: Level 1 test
         run: |
-          autotest -riscv -w ${GITHUB_WORKSPACE}/target -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest-lv1-riscv.log
+          autotest -riscv -w ${GITHUB_WORKSPACE}/target -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
           tail -n1 autotest.log | grep -q "PASSED"
 
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
           name: autotest-lv1-riscv.log
-          path: autotest-lv1-riscv.log
+          path: autotest.log

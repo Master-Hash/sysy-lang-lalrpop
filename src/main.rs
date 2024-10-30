@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     // 输出到文件
     match mode.as_str() {
         "-koopa" => {
-            std::fs::write(output, text_form_ir)?;
+            std::fs::write(output, &text_form_ir)?;
         }
         "-riscv" => {
             let mut res = "  .text\n".to_string();
@@ -89,6 +89,7 @@ fn main() -> Result<()> {
             }
             println!("{}", &res);
             // panic!("RISC-V backend not implemented");
+            std::fs::write(output, &res)?;
         }
         "-perf" => {
             panic!("Performance analysis not implemented");

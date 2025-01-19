@@ -76,6 +76,97 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             res.push(r);
             r
         }
+        Exp::LTBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Lt, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::LEBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Le, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::GTBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Gt, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::GEBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Ge, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::EqBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Eq, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::NeBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::NotEq, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::LAndBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let bit_and_value = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::And, lhs, rhs);
+            let r =
+                function_data
+                    .dfg_mut()
+                    .new_value()
+                    .binary(BinaryOp::NotEq, bit_and_value, zero);
+            res.push(bit_and_value);
+            res.push(r);
+            r
+        }
+        Exp::LOrBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let bit_or_value = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Or, lhs, rhs);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::NotEq, bit_or_value, zero);
+            res.push(bit_or_value);
+            res.push(r);
+            r
+        }
     }
 }
 

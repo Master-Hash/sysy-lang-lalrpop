@@ -55,6 +55,14 @@ pub enum Exp {
     ModBinary(Box<Exp>, Box<Exp>),
     AddBinary(Box<Exp>, Box<Exp>),
     SubBinary(Box<Exp>, Box<Exp>),
+    LTBinary(Box<Exp>, Box<Exp>),
+    LEBinary(Box<Exp>, Box<Exp>),
+    GTBinary(Box<Exp>, Box<Exp>),
+    GEBinary(Box<Exp>, Box<Exp>),
+    EqBinary(Box<Exp>, Box<Exp>),
+    NeBinary(Box<Exp>, Box<Exp>),
+    LAndBinary(Box<Exp>, Box<Exp>),
+    LOrBinary(Box<Exp>, Box<Exp>),
 }
 
 // #[derive(Debug)]

@@ -42,6 +42,18 @@ Exp: Exp = {
   #[precedence(level="4")] #[assoc(side="left")]
   <lhs: Exp> "+" <rhs: Exp> => Exp::AddBinary(Box::new(lhs), Box::new(rhs)),
   <lhs: Exp> "-" <rhs: Exp> => Exp::SubBinary(Box::new(lhs), Box::new(rhs)),
+  #[precedence(level="6")] #[assoc(side="left")]
+  <lhs: Exp> "<" <rhs: Exp> => Exp::LTBinary(Box::new(lhs), Box::new(rhs)),
+  <lhs: Exp> "<=" <rhs: Exp> => Exp::LEBinary(Box::new(lhs), Box::new(rhs)),
+  <lhs: Exp> ">" <rhs: Exp> => Exp::GTBinary(Box::new(lhs), Box::new(rhs)),
+  <lhs: Exp> ">=" <rhs: Exp> => Exp::GEBinary(Box::new(lhs), Box::new(rhs)),
+  #[precedence(level="7")] #[assoc(side="left")]
+  <lhs: Exp> "==" <rhs: Exp> => Exp::EqBinary(Box::new(lhs), Box::new(rhs)),
+  <lhs: Exp> "!=" <rhs: Exp> => Exp::NeBinary(Box::new(lhs), Box::new(rhs)),
+  #[precedence(level="11")] #[assoc(side="left")]
+  <lhs: Exp> "&&" <rhs: Exp> => Exp::LAndBinary(Box::new(lhs), Box::new(rhs)),
+  #[precedence(level="12")] #[assoc(side="left")]
+  <lhs: Exp> "||" <rhs: Exp> => Exp::LOrBinary(Box::new(lhs), Box::new(rhs)),
 }
 
 // BinaryExp:

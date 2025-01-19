@@ -136,22 +136,28 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             res.push(r);
             r
         }
+        // todo 短路
         Exp::LAndBinary(lhs, rhs) => {
             let lhs = traverse_exp(lhs, function_data, res);
             let rhs = traverse_exp(rhs, function_data, res);
-            let bit_and_value = function_data
+            let bit_lhs = function_data
                 .dfg_mut()
                 .new_value()
-                .binary(BinaryOp::And, lhs, rhs);
-            let r =
-                function_data
-                    .dfg_mut()
-                    .new_value()
-                    .binary(BinaryOp::NotEq, bit_and_value, zero);
-            res.push(bit_and_value);
+                .binary(BinaryOp::NotEq, lhs, zero);
+            let bit_rhs = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::NotEq, rhs, zero);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::And, bit_lhs, bit_rhs);
+            res.push(bit_lhs);
+            res.push(bit_rhs);
             res.push(r);
             r
         }
+        // todo 短路
         Exp::LOrBinary(lhs, rhs) => {
             let lhs = traverse_exp(lhs, function_data, res);
             let rhs = traverse_exp(rhs, function_data, res);

@@ -27,19 +27,33 @@ Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
 Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
 
 // Todo
-Exp: Exp = <unary_exp: UnaryExp> => Exp { <> };
-
-PrimaryExp: PrimaryExp = {
-    "(" <exp: Exp> ")" => PrimaryExp::Exp(Box::new(exp)),
-    Number => PrimaryExp::Number(<>),
+// https://en.cppreference.com/w/c/language/operator_precedence
+Exp: Exp = {
+  PrimaryExp => <>,
+  "+" <e: Exp> => Exp::PlusUnary(Box::new(e)),
+  "-" <e: Exp> => Exp::MinusUnary(Box::new(e)),
+  "!" <e: Exp> => Exp::NotUnary(Box::new(e)),
 }
 
-UnaryExp: UnaryExp = {
-    PrimaryExp => UnaryExp::Primary(<>),
-    "+" <e: UnaryExp> => UnaryExp::PlusUnary(Box::new(e)),
-    "-" <e: UnaryExp> => UnaryExp::MinusUnary(Box::new(e)),
-    "!" <e: UnaryExp> => UnaryExp::NotUnary(Box::new(e)),
+PrimaryExp: Exp = {
+  "(" <exp: Exp> ")" => Exp::Exp(Box::new(exp)),
+  Number => Exp::Number(<>),
 }
+
+
+//  <unary_exp: UnaryExp> => Exp { <> };
+
+// PrimaryExp: PrimaryExp = {
+//     "(" <exp: Exp> ")" => PrimaryExp::Exp(Box::new(exp)),
+//     Number => PrimaryExp::Number(<>),
+// }
+
+// UnaryExp: UnaryExp = {
+//     PrimaryExp => UnaryExp::Primary(<>),
+//     "+" <e: UnaryExp> => UnaryExp::PlusUnary(Box::new(e)),
+//     "-" <e: UnaryExp> => UnaryExp::MinusUnary(Box::new(e)),
+//     "!" <e: UnaryExp> => UnaryExp::NotUnary(Box::new(e)),
+// }
 
 Number: i32 = <num: IntConst> => <>;
 

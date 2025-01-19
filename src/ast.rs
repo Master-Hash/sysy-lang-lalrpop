@@ -46,10 +46,15 @@ pub struct Stmt {
 #[derive(Debug)]
 pub enum Exp {
     Number(i32),
-    Exp(Box<Exp>),
+    Paren(Box<Exp>),
     PlusUnary(Box<Exp>),
     MinusUnary(Box<Exp>),
     NotUnary(Box<Exp>),
+    MulBinary(Box<Exp>, Box<Exp>),
+    DivBinary(Box<Exp>, Box<Exp>),
+    ModBinary(Box<Exp>, Box<Exp>),
+    AddBinary(Box<Exp>, Box<Exp>),
+    SubBinary(Box<Exp>, Box<Exp>),
 }
 
 // #[derive(Debug)]

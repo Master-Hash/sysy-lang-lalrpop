@@ -29,14 +29,25 @@ Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
 // Todo
 // https://en.cppreference.com/w/c/language/operator_precedence
 Exp: Exp = {
+  #[precedence(level="1")]
   PrimaryExp => <>,
+  #[precedence(level="2")] #[assoc(side="right")]
   "+" <e: Exp> => Exp::PlusUnary(Box::new(e)),
   "-" <e: Exp> => Exp::MinusUnary(Box::new(e)),
   "!" <e: Exp> => Exp::NotUnary(Box::new(e)),
+  #[precedence(level="3")] #[assoc(side="left")]
+  <lhs: Exp> "*" <rhs: Exp> => Exp::MulBinary(Box::new(lhs), Box::new(rhs)),
+  <lhs: Exp> "/" <rhs: Exp> => Exp::DivBinary(Box::new(lhs), Box::new(rhs)),
+  <lhs: Exp> "%" <rhs: Exp> => Exp::ModBinary(Box::new(lhs), Box::new(rhs)),
+  #[precedence(level="4")] #[assoc(side="left")]
+  <lhs: Exp> "+" <rhs: Exp> => Exp::AddBinary(Box::new(lhs), Box::new(rhs)),
+  <lhs: Exp> "-" <rhs: Exp> => Exp::SubBinary(Box::new(lhs), Box::new(rhs)),
 }
 
+// BinaryExp:
+
 PrimaryExp: Exp = {
-  "(" <exp: Exp> ")" => Exp::Exp(Box::new(exp)),
+  "(" <exp: Exp> ")" => Exp::Paren(Box::new(exp)),
   Number => Exp::Number(<>),
 }
 

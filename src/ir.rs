@@ -6,7 +6,7 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
     let zero = function_data.dfg_mut().new_value().integer(0);
     match exp {
         Exp::Number(num) => function_data.dfg_mut().new_value().integer(*num),
-        Exp::Exp(exp) => traverse_exp(exp, function_data, res),
+        Exp::Paren(exp) => traverse_exp(exp, function_data, res),
         Exp::PlusUnary(exp) => traverse_exp(exp, function_data, res),
         Exp::MinusUnary(exp) => {
             let lhs = traverse_exp(exp, function_data, res);
@@ -23,6 +23,56 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
                 .dfg_mut()
                 .new_value()
                 .binary(BinaryOp::Eq, lhs, zero);
+            res.push(r);
+            r
+        }
+        Exp::MulBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Mul, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::DivBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Div, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::ModBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Mod, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::AddBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Add, lhs, rhs);
+            res.push(r);
+            r
+        }
+        Exp::SubBinary(lhs, rhs) => {
+            let lhs = traverse_exp(lhs, function_data, res);
+            let rhs = traverse_exp(rhs, function_data, res);
+            let r = function_data
+                .dfg_mut()
+                .new_value()
+                .binary(BinaryOp::Sub, lhs, rhs);
             res.push(r);
             r
         }

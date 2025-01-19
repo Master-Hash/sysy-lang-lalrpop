@@ -24,7 +24,22 @@ FuncType: FuncType = "int" => FuncType::Int;
 
 Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
 
-Stmt: Stmt = "return" <num: Number> ";" => Stmt { <> };
+Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
+
+// Todo
+Exp: Exp = <unary_exp: UnaryExp> => Exp { <> };
+
+PrimaryExp: PrimaryExp = {
+    "(" <exp: Exp> ")" => PrimaryExp::Exp(Box::new(exp)),
+    Number => PrimaryExp::Number(<>),
+}
+
+UnaryExp: UnaryExp = {
+    PrimaryExp => UnaryExp::Primary(<>),
+    "+" <e: UnaryExp> => UnaryExp::PlusUnary(Box::new(e)),
+    "-" <e: UnaryExp> => UnaryExp::MinusUnary(Box::new(e)),
+    "!" <e: UnaryExp> => UnaryExp::NotUnary(Box::new(e)),
+}
 
 Number: i32 = <num: IntConst> => <>;
 

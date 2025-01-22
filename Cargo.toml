@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [build-dependencies]
-lalrpop = "0.22.0"
+lalrpop = "0.22.1"
 
 [dependencies]
 koopa = "0.0.8"
-lalrpop-util = { version = "0.22.0", features = ["lexer"] }
+lalrpop-util = { version = "0.22.1", features = ["lexer"] }
 
 [profile.release]
 codegen-units = 1

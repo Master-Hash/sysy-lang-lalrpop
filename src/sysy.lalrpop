@@ -21,10 +21,39 @@ FuncDef: FuncDef = {
 }
 
 FuncType: FuncType = "int" => FuncType::Int;
+BType: BType = "int" => BType::Int;
 
-Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
+Block: Block = "{" <items: BlockItem*> "}" => Block { <> };
+
+BlockItem: BlockItem = {
+  <stmt: Stmt> => BlockItem::Stmt(stmt),
+  <decl: Decl> => BlockItem::Decl(decl),
+}
+
+Decl: Decl = {
+  <const_decl: ConstDecl> => <>,
+}
+
+ConstDecl: Decl = {
+  "const" <b: BType> <mut const_defs: (<ConstDef> ",")*> <const_def_one: ConstDef> ";" => Decl::ConstDecl {
+    b_type: b,
+    const_def: {
+      const_defs.push(const_def_one);
+      const_defs
+    }
+  }
+}
+
+ConstDef: ConstDef = {
+  <ident: Ident> "=" <exp: Exp> => ConstDef {
+    ident: ident,
+    const_exp: ConstExp(exp),
+  }
+}
 
 Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
+
+LVal: String = <ident: Ident> => ident;
 
 // Todo
 // https://en.cppreference.com/w/c/language/operator_precedence
@@ -60,6 +89,7 @@ Exp: Exp = {
 
 PrimaryExp: Exp = {
   "(" <exp: Exp> ")" => Exp::Paren(Box::new(exp)),
+  LVal => Exp::LVal(<>),
   Number => Exp::Number(<>),
 }
 

@@ -16,13 +16,39 @@ pub enum FuncType {
 }
 
 #[derive(Debug)]
-pub struct Block {
-    pub stmt: Stmt,
+pub enum BType {
+    Int,
 }
 
 #[derive(Debug)]
+pub struct Block {
+    pub items: Vec<BlockItem>,
+}
+
+#[derive(Debug)]
+pub enum BlockItem {
+    Stmt(Stmt),
+    Decl(Decl),
+}
+
+// 这玩意是时候改名叫 Return Stmt 了
+#[derive(Debug)]
 pub struct Stmt {
     pub exp: Exp,
+}
+
+#[derive(Debug)]
+pub enum Decl {
+    ConstDecl {
+        b_type: BType,
+        const_def: Vec<ConstDef>,
+    },
+}
+
+#[derive(Debug)]
+pub struct ConstDef {
+    pub ident: String,
+    pub const_exp: ConstExp,
 }
 
 // Exp         ::= LOrExp;
@@ -46,6 +72,7 @@ pub struct Stmt {
 #[derive(Debug)]
 pub enum Exp {
     Number(i32),
+    LVal(String),
     Paren(Box<Exp>),
     PlusUnary(Box<Exp>),
     MinusUnary(Box<Exp>),
@@ -64,6 +91,12 @@ pub enum Exp {
     LAndBinary(Box<Exp>, Box<Exp>),
     LOrBinary(Box<Exp>, Box<Exp>),
 }
+
+// 事实上计算常量仍然需要借助符号表
+// 在解析时就算出来意义不大
+// type ConstExp = i32;
+#[derive(Debug)]
+pub struct ConstExp(pub Exp);
 
 // #[derive(Debug)]
 // pub enum PrimaryExp {

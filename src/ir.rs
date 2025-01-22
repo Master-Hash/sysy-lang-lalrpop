@@ -1,15 +1,147 @@
-use crate::ast::{CompUnit, Exp, FuncType};
+use std::collections::HashMap;
+
+use crate::ast::{BType, BlockItem, CompUnit, Decl, Exp, FuncType};
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
 
-fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value>) -> Value {
+fn traverse_const_exp(exp: &Exp, sym_table: &mut HashMap<String, Sym>) -> i32 {
+    match exp {
+        Exp::Number(num) => *num,
+        Exp::Paren(exp) => traverse_const_exp(exp, sym_table),
+        Exp::PlusUnary(exp) => traverse_const_exp(exp, sym_table),
+        Exp::MinusUnary(exp) => {
+            let lhs = traverse_const_exp(exp, sym_table);
+            -lhs
+        }
+        Exp::NotUnary(exp) => {
+            let lhs = traverse_const_exp(exp, sym_table);
+            if lhs == 0 {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::MulBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            lhs * rhs
+        }
+        Exp::DivBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            lhs / rhs
+        }
+        Exp::ModBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            lhs % rhs
+        }
+        Exp::AddBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            lhs + rhs
+        }
+        Exp::SubBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            lhs - rhs
+        }
+        Exp::LTBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            if lhs < rhs {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::LEBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            if lhs <= rhs {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::GTBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            if lhs > rhs {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::GEBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            if lhs >= rhs {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::EqBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            if lhs == rhs {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::NeBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            if lhs != rhs {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::LAndBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            if lhs != 0 && rhs != 0 {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::LOrBinary(lhs, rhs) => {
+            let lhs = traverse_const_exp(lhs, sym_table);
+            let rhs = traverse_const_exp(rhs, sym_table);
+            if lhs != 0 || rhs != 0 {
+                1
+            } else {
+                0
+            }
+        }
+        Exp::LVal(ident) => {
+            let sym = sym_table.get(ident).unwrap();
+            sym.value
+        }
+    }
+}
+
+fn traverse_exp(
+    exp: &Exp,
+    function_data: &mut FunctionData,
+    res: &mut Vec<Value>,
+    sym_table: &mut HashMap<String, Sym>,
+) -> Value {
     let zero = function_data.dfg_mut().new_value().integer(0);
     match exp {
         Exp::Number(num) => function_data.dfg_mut().new_value().integer(*num),
-        Exp::Paren(exp) => traverse_exp(exp, function_data, res),
-        Exp::PlusUnary(exp) => traverse_exp(exp, function_data, res),
+        Exp::LVal(ident) => {
+            let sym = sym_table.get(ident).unwrap();
+            function_data.dfg_mut().new_value().integer(sym.value)
+        }
+        Exp::Paren(exp) => traverse_exp(exp, function_data, res, sym_table),
+        Exp::PlusUnary(exp) => traverse_exp(exp, function_data, res, sym_table),
         Exp::MinusUnary(exp) => {
-            let lhs = traverse_exp(exp, function_data, res);
+            let lhs = traverse_exp(exp, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -18,7 +150,7 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::NotUnary(exp) => {
-            let lhs = traverse_exp(exp, function_data, res);
+            let lhs = traverse_exp(exp, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -27,8 +159,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::MulBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -37,8 +169,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::DivBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -47,8 +179,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::ModBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -57,8 +189,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::AddBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -67,8 +199,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::SubBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -77,8 +209,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::LTBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -87,8 +219,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::LEBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -97,8 +229,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::GTBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -107,8 +239,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::GEBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -117,8 +249,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::EqBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -127,8 +259,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
             r
         }
         Exp::NeBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let r = function_data
                 .dfg_mut()
                 .new_value()
@@ -138,8 +270,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
         }
         // todo 短路
         Exp::LAndBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let bit_lhs = function_data
                 .dfg_mut()
                 .new_value()
@@ -159,8 +291,8 @@ fn traverse_exp(exp: &Exp, function_data: &mut FunctionData, res: &mut Vec<Value
         }
         // todo 短路
         Exp::LOrBinary(lhs, rhs) => {
-            let lhs = traverse_exp(lhs, function_data, res);
-            let rhs = traverse_exp(rhs, function_data, res);
+            let lhs = traverse_exp(lhs, function_data, res, sym_table);
+            let rhs = traverse_exp(rhs, function_data, res, sym_table);
             let bit_or_value = function_data
                 .dfg_mut()
                 .new_value()
@@ -185,7 +317,6 @@ impl CompUnit {
             vec![],
             match self.func_def.func_type {
                 FuncType::Int => Type::get_i32(),
-                _ => todo!(),
             },
         ));
         let main_data = program.func_mut(m);
@@ -196,13 +327,37 @@ impl CompUnit {
             .basic_block(Some("%entry".into()));
         main_data.layout_mut().bbs_mut().extend([entry]);
 
-        let exp_tree = &self.func_def.block.stmt.exp;
+        let items = &self.func_def.block.items;
         let mut res: Vec<Value> = Vec::new();
-        let to_return = traverse_exp(exp_tree, main_data, &mut res);
-        let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
-        res.push(ret);
+        let mut sym_table: HashMap<String, Sym> = HashMap::new();
+
+        for item in items {
+            match item {
+                BlockItem::Stmt(stmt) => {
+                    let to_return = traverse_exp(&stmt.exp, main_data, &mut res, &mut sym_table);
+                    let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
+                    res.push(ret);
+                }
+                BlockItem::Decl(decl) => match decl {
+                    Decl::ConstDecl { b_type, const_def } => match b_type {
+                        BType::Int => {
+                            for const_def in const_def {
+                                let value: i32 =
+                                    traverse_const_exp(&const_def.const_exp.0, &mut sym_table);
+                                sym_table.insert(const_def.ident.clone(), Sym { value });
+                            }
+                        }
+                    },
+                },
+            }
+        }
 
         main_data.layout_mut().bb_mut(entry).insts_mut().extend(res);
         program
     }
+}
+
+struct Sym {
+    // name: String,
+    value: i32,
 }

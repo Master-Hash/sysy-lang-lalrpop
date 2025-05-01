@@ -35,13 +35,14 @@ fn main() -> Result<()> {
 
     // 输出解析得到的 AST
     println!("{:#?}", ast);
+    // todo!();
 
     let program = ast.new_ir();
 
     // 输出 IR
-    let mut gen = KoopaGenerator::new(Vec::new());
-    gen.generate_on(&program).unwrap();
-    let text_form_ir = std::str::from_utf8(&gen.writer()).unwrap().to_string();
+    let mut ir_gen = KoopaGenerator::new(Vec::new());
+    ir_gen.generate_on(&program).unwrap();
+    let text_form_ir = std::str::from_utf8(&ir_gen.writer()).unwrap().to_string();
     println!("{}", text_form_ir);
 
     // 输出到文件

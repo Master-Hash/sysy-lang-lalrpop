@@ -33,8 +33,9 @@ pub enum BlockItem {
 
 // 这玩意是时候改名叫 Return Stmt 了
 #[derive(Debug)]
-pub struct Stmt {
-    pub exp: Exp,
+pub enum Stmt {
+    Return(Exp),
+    Assign { ident: String, exp: Exp },
 }
 
 #[derive(Debug)]
@@ -43,12 +44,22 @@ pub enum Decl {
         b_type: BType,
         const_def: Vec<ConstDef>,
     },
+    VariableDecl {
+        b_type: BType,
+        var_def: Vec<VarDef>,
+    },
 }
 
 #[derive(Debug)]
 pub struct ConstDef {
     pub ident: String,
     pub const_exp: ConstExp,
+}
+
+#[derive(Debug)]
+pub struct VarDef {
+    pub ident: String,
+    pub exp: Option<Exp>,
 }
 
 // Exp         ::= LOrExp;

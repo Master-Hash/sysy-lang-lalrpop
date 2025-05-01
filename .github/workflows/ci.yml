@@ -3,8 +3,18 @@ on:
   push:
     branches: [main]
 jobs:
-  lv1-koopa:
+  main:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        target: [koopa, riscv]
+        level: [lv1, lv4, lv3]
+        exclude:
+          - target: riscv
+            level: lv3
+          - target: riscv
+            level: lv4
     container:
       image: ghcr.io/master-hash/compiler-dev
     steps:
@@ -24,78 +34,13 @@ jobs:
             target/
           key: ${{ runner.os }}-${{ steps.get-version.outputs.rustc-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Level 1 IR test
+      - name: Level ${{ matrix.level }} ${{ matrix.target }} test
         run: |
-          autotest -w ${GITHUB_WORKSPACE}/target -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
+          autotest -${{ matrix.target }} -w ${GITHUB_WORKSPACE}/target -s ${{ matrix.level }} ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
           tail -n1 autotest.log | grep -q "PASSED"
 
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: autotest-lv1-koopa.log
-          path: autotest.log
-
-  lv1-riscv:
-    runs-on: ubuntu-latest
-    needs: lv1-koopa
-    container:
-      image: ghcr.io/master-hash/compiler-dev
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get rustc version
-        run: echo "rustc-version=$(rustc --version)" >> "${GITHUB_OUTPUT}"
-        id: get-version
-
-      - uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ steps.get-version.outputs.rustc-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Level 1 assembly test
-        run: |
-          autotest -riscv -w ${GITHUB_WORKSPACE}/target -s lv1 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
-          tail -n1 autotest.log | grep -q "PASSED"
-
-      - uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: autotest-lv1-riscv.log
-          path: autotest.log
-
-  lv3-koopa:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/master-hash/compiler-dev
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get rustc version
-        run: echo "rustc-version=$(rustc --version)" >> "${GITHUB_OUTPUT}"
-        id: get-version
-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ steps.get-version.outputs.rustc-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Level 3 IR test
-        run: |
-          autotest -w ${GITHUB_WORKSPACE}/target -s lv3 ${GITHUB_WORKSPACE} 2>&1 | tee autotest.log
-          tail -n1 autotest.log | grep -q "PASSED"
-
-      - uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: autotest-lv3-koopa.log
+          name: autotest-${{ matrix.level }}-${{ matrix.target }}.log
           path: autotest.log

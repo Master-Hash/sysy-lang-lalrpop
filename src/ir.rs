@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{BType, BlockItem, CompUnit, Decl, Exp, FuncType};
+use crate::ast::{BType, BlockItem, CompUnit, Decl, Exp, FuncType, Stmt};
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
 
@@ -15,11 +15,7 @@ fn traverse_const_exp(exp: &Exp, sym_table: &mut HashMap<String, Sym>) -> i32 {
         }
         Exp::NotUnary(exp) => {
             let lhs = traverse_const_exp(exp, sym_table);
-            if lhs == 0 {
-                1
-            } else {
-                0
-            }
+            if lhs == 0 { 1 } else { 0 }
         }
         Exp::MulBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
@@ -49,78 +45,49 @@ fn traverse_const_exp(exp: &Exp, sym_table: &mut HashMap<String, Sym>) -> i32 {
         Exp::LTBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
             let rhs = traverse_const_exp(rhs, sym_table);
-            if lhs < rhs {
-                1
-            } else {
-                0
-            }
+            if lhs < rhs { 1 } else { 0 }
         }
         Exp::LEBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
             let rhs = traverse_const_exp(rhs, sym_table);
-            if lhs <= rhs {
-                1
-            } else {
-                0
-            }
+            if lhs <= rhs { 1 } else { 0 }
         }
         Exp::GTBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
             let rhs = traverse_const_exp(rhs, sym_table);
-            if lhs > rhs {
-                1
-            } else {
-                0
-            }
+            if lhs > rhs { 1 } else { 0 }
         }
         Exp::GEBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
             let rhs = traverse_const_exp(rhs, sym_table);
-            if lhs >= rhs {
-                1
-            } else {
-                0
-            }
+            if lhs >= rhs { 1 } else { 0 }
         }
         Exp::EqBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
             let rhs = traverse_const_exp(rhs, sym_table);
-            if lhs == rhs {
-                1
-            } else {
-                0
-            }
+            if lhs == rhs { 1 } else { 0 }
         }
         Exp::NeBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
             let rhs = traverse_const_exp(rhs, sym_table);
-            if lhs != rhs {
-                1
-            } else {
-                0
-            }
+            if lhs != rhs { 1 } else { 0 }
         }
         Exp::LAndBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
             let rhs = traverse_const_exp(rhs, sym_table);
-            if lhs != 0 && rhs != 0 {
-                1
-            } else {
-                0
-            }
+            if lhs != 0 && rhs != 0 { 1 } else { 0 }
         }
         Exp::LOrBinary(lhs, rhs) => {
             let lhs = traverse_const_exp(lhs, sym_table);
             let rhs = traverse_const_exp(rhs, sym_table);
-            if lhs != 0 || rhs != 0 {
-                1
-            } else {
-                0
-            }
+            if lhs != 0 || rhs != 0 { 1 } else { 0 }
         }
         Exp::LVal(ident) => {
             let sym = sym_table.get(ident).unwrap();
-            sym.value
+            match sym {
+                Sym::Const { value } => *value,
+                Sym::Variable { value } => panic!("Can't use variable in const expression"),
+            }
         }
     }
 }
@@ -136,7 +103,15 @@ fn traverse_exp(
         Exp::Number(num) => function_data.dfg_mut().new_value().integer(*num),
         Exp::LVal(ident) => {
             let sym = sym_table.get(ident).unwrap();
-            function_data.dfg_mut().new_value().integer(sym.value)
+            match sym {
+                Sym::Const { value } => function_data.dfg_mut().new_value().integer(*value),
+                Sym::Variable { value } => {
+                    let l = function_data.dfg_mut().new_value().load(*value);
+                    res.push(l);
+                    l
+                }
+            }
+            // function_data.dfg_mut().new_value().integer(sym.value)
         }
         Exp::Paren(exp) => traverse_exp(exp, function_data, res, sym_table),
         Exp::PlusUnary(exp) => traverse_exp(exp, function_data, res, sym_table),
@@ -333,18 +308,46 @@ impl CompUnit {
 
         for item in items {
             match item {
-                BlockItem::Stmt(stmt) => {
-                    let to_return = traverse_exp(&stmt.exp, main_data, &mut res, &mut sym_table);
-                    let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
-                    res.push(ret);
-                }
+                BlockItem::Stmt(stmt) => match stmt {
+                    Stmt::Return(exp) => {
+                        let to_return = traverse_exp(&exp, main_data, &mut res, &mut sym_table);
+                        let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
+                        res.push(ret);
+                    }
+                    Stmt::Assign { ident, exp } => {
+                        let sym = sym_table.get(ident).unwrap().clone();
+                        match sym {
+                            Sym::Const { value: _ } => panic!("Can't assign to const"),
+                            Sym::Variable { value } => {
+                                let v = traverse_exp(exp, main_data, &mut res, &mut sym_table);
+                                let s = main_data.dfg_mut().new_value().store(v, value);
+                                res.push(s);
+                            }
+                        }
+                    }
+                },
                 BlockItem::Decl(decl) => match decl {
                     Decl::ConstDecl { b_type, const_def } => match b_type {
                         BType::Int => {
                             for const_def in const_def {
                                 let value: i32 =
                                     traverse_const_exp(&const_def.const_exp.0, &mut sym_table);
-                                sym_table.insert(const_def.ident.clone(), Sym { value });
+                                sym_table.insert(const_def.ident.clone(), Sym::Const { value });
+                            }
+                        }
+                    },
+                    Decl::VariableDecl { b_type, var_def } => match b_type {
+                        BType::Int => {
+                            for var_def in var_def {
+                                let store = main_data.dfg_mut().new_value().alloc(Type::get_i32());
+                                res.push(store);
+                                if let Some(exp) = &var_def.exp {
+                                    let v = traverse_exp(exp, main_data, &mut res, &mut sym_table);
+                                    let s = main_data.dfg_mut().new_value().store(v, store);
+                                    res.push(s);
+                                }
+                                sym_table
+                                    .insert(var_def.ident.clone(), Sym::Variable { value: store });
                             }
                         }
                     },
@@ -357,7 +360,8 @@ impl CompUnit {
     }
 }
 
-struct Sym {
-    // name: String,
-    value: i32,
+#[derive(Debug, Clone)]
+enum Sym {
+    Const { value: i32 },
+    Variable { value: Value },
 }

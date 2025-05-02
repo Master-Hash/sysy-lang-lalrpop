@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::rc::{Rc, Weak};
 
-use crate::ast::{BType, BlockItem, CompUnit, Decl, Exp, FuncType, Stmt};
+use crate::ast::{BType, Block, BlockItem, CompUnit, Decl, Exp, FuncType, Stmt};
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
 
-fn traverse_const_exp(exp: &Exp, sym_table: &mut HashMap<String, Sym>) -> i32 {
+fn traverse_const_exp(exp: &Exp, sym_table: &CascadeTable) -> i32 {
     match exp {
         Exp::Number(num) => *num,
         Exp::Paren(exp) => traverse_const_exp(exp, sym_table),
@@ -83,10 +84,10 @@ fn traverse_const_exp(exp: &Exp, sym_table: &mut HashMap<String, Sym>) -> i32 {
             if lhs != 0 || rhs != 0 { 1 } else { 0 }
         }
         Exp::LVal(ident) => {
-            let sym = sym_table.get(ident).unwrap();
+            let sym = sym_table.get(ident);
             match sym {
                 Sym::Const { value } => *value,
-                Sym::Variable { value } => panic!("Can't use variable in const expression"),
+                Sym::Variable { value: _ } => panic!("Can't use variable in const expression"),
             }
         }
     }
@@ -96,13 +97,13 @@ fn traverse_exp(
     exp: &Exp,
     function_data: &mut FunctionData,
     res: &mut Vec<Value>,
-    sym_table: &mut HashMap<String, Sym>,
+    sym_table: &CascadeTable,
 ) -> Value {
     let zero = function_data.dfg_mut().new_value().integer(0);
     match exp {
         Exp::Number(num) => function_data.dfg_mut().new_value().integer(*num),
         Exp::LVal(ident) => {
-            let sym = sym_table.get(ident).unwrap();
+            let sym = sym_table.get(ident);
             match sym {
                 Sym::Const { value } => function_data.dfg_mut().new_value().integer(*value),
                 Sym::Variable { value } => {
@@ -283,6 +284,85 @@ fn traverse_exp(
     }
 }
 
+impl Block {
+    pub fn new_ir(
+        &self,
+        function_data: &mut FunctionData,
+        cascade_table: &mut CascadeTable,
+    ) -> Vec<Value> {
+        let mut res: Vec<Value> = Vec::new();
+        cascade_table.indent();
+        // let mut sym_table = cascade_table.0.last_mut().unwrap();
+        let main_data = function_data;
+
+        for item in &self.items {
+            match item {
+                BlockItem::Stmt(stmt) => match stmt {
+                    Stmt::Return(exp) => {
+                        let to_return = traverse_exp(exp, main_data, &mut res, cascade_table);
+                        let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
+                        res.push(ret);
+                    }
+                    Stmt::Assign { ident, exp } => {
+                        let sym = cascade_table.get(ident).clone();
+                        match sym {
+                            Sym::Const { value: _ } => panic!("Can't assign to const"),
+                            Sym::Variable { value } => {
+                                let v = traverse_exp(exp, main_data, &mut res, cascade_table);
+                                let s = main_data.dfg_mut().new_value().store(v, value);
+                                res.push(s);
+                            }
+                        }
+                    }
+                    Stmt::Exp(_exp) => {
+                        let v = traverse_exp(_exp, main_data, &mut res, cascade_table);
+                    }
+                    Stmt::Block(block) => {
+                        let block_res = block.new_ir(main_data, cascade_table);
+                        res.extend(block_res);
+                    }
+                },
+                BlockItem::Decl(decl) => match decl {
+                    Decl::ConstDecl { b_type, const_def } => match b_type {
+                        BType::Int => {
+                            for const_def in const_def {
+                                let value: i32 =
+                                    traverse_const_exp(&const_def.const_exp.0, cascade_table);
+                                cascade_table
+                                    .0
+                                    .last_mut()
+                                    .unwrap()
+                                    .insert(const_def.ident.clone(), Sym::Const { value });
+                            }
+                        }
+                    },
+                    Decl::VariableDecl { b_type, var_def } => match b_type {
+                        BType::Int => {
+                            for var_def in var_def {
+                                // let sym_table = cascade_table.0.last_mut().unwrap();
+                                let store = main_data.dfg_mut().new_value().alloc(Type::get_i32());
+                                res.push(store);
+                                if let Some(exp) = &var_def.exp {
+                                    let v = traverse_exp(exp, main_data, &mut res, cascade_table);
+                                    let s = main_data.dfg_mut().new_value().store(v, store);
+                                    res.push(s);
+                                }
+                                cascade_table
+                                    .0
+                                    .last_mut()
+                                    .unwrap()
+                                    .insert(var_def.ident.clone(), Sym::Variable { value: store });
+                            }
+                        }
+                    },
+                },
+            }
+        }
+        cascade_table.pop();
+        res
+    }
+}
+
 // https://docs.rs/koopa/latest/koopa/ir/
 impl CompUnit {
     pub fn new_ir(&self) -> Program {
@@ -302,58 +382,10 @@ impl CompUnit {
             .basic_block(Some("%entry".into()));
         main_data.layout_mut().bbs_mut().extend([entry]);
 
-        let items = &self.func_def.block.items;
-        let mut res: Vec<Value> = Vec::new();
-        let mut sym_table: HashMap<String, Sym> = HashMap::new();
+        let block = &self.func_def.block;
+        let mut cadcade_table = CascadeTable::new();
 
-        for item in items {
-            match item {
-                BlockItem::Stmt(stmt) => match stmt {
-                    Stmt::Return(exp) => {
-                        let to_return = traverse_exp(&exp, main_data, &mut res, &mut sym_table);
-                        let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
-                        res.push(ret);
-                    }
-                    Stmt::Assign { ident, exp } => {
-                        let sym = sym_table.get(ident).unwrap().clone();
-                        match sym {
-                            Sym::Const { value: _ } => panic!("Can't assign to const"),
-                            Sym::Variable { value } => {
-                                let v = traverse_exp(exp, main_data, &mut res, &mut sym_table);
-                                let s = main_data.dfg_mut().new_value().store(v, value);
-                                res.push(s);
-                            }
-                        }
-                    }
-                },
-                BlockItem::Decl(decl) => match decl {
-                    Decl::ConstDecl { b_type, const_def } => match b_type {
-                        BType::Int => {
-                            for const_def in const_def {
-                                let value: i32 =
-                                    traverse_const_exp(&const_def.const_exp.0, &mut sym_table);
-                                sym_table.insert(const_def.ident.clone(), Sym::Const { value });
-                            }
-                        }
-                    },
-                    Decl::VariableDecl { b_type, var_def } => match b_type {
-                        BType::Int => {
-                            for var_def in var_def {
-                                let store = main_data.dfg_mut().new_value().alloc(Type::get_i32());
-                                res.push(store);
-                                if let Some(exp) = &var_def.exp {
-                                    let v = traverse_exp(exp, main_data, &mut res, &mut sym_table);
-                                    let s = main_data.dfg_mut().new_value().store(v, store);
-                                    res.push(s);
-                                }
-                                sym_table
-                                    .insert(var_def.ident.clone(), Sym::Variable { value: store });
-                            }
-                        }
-                    },
-                },
-            }
-        }
+        let res = block.new_ir(main_data, &mut cadcade_table);
 
         main_data.layout_mut().bb_mut(entry).insts_mut().extend(res);
         program
@@ -364,4 +396,30 @@ impl CompUnit {
 enum Sym {
     Const { value: i32 },
     Variable { value: Value },
+}
+
+pub struct CascadeTable(Vec<HashMap<String, Sym>>);
+
+impl CascadeTable {
+    fn new() -> Self {
+        Self(vec![HashMap::new()])
+    }
+
+    fn insert(&mut self, key: String, value: Sym) {
+        self.0.last_mut().unwrap().insert(key, value);
+    }
+    fn get(&self, key: &str) -> &Sym {
+        for table in self.0.iter().rev() {
+            if let Some(value) = table.get(key) {
+                return value;
+            }
+        }
+        panic!("Key not found: {}", key);
+    }
+    fn indent(&mut self) {
+        self.0.push(HashMap::new());
+    }
+    fn pop(&mut self) {
+        self.0.pop();
+    }
 }

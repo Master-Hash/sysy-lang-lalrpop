@@ -75,6 +75,8 @@ Stmt: Stmt = {
     ident: lval,
     exp: exp,
   },
+  <block: Block> => Stmt::Block(<>),
+  <exp: Exp> ";" => Stmt::Exp(<>),
 }
 
 LVal: String = <ident: Ident> => ident;

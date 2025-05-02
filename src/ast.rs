@@ -36,6 +36,8 @@ pub enum BlockItem {
 pub enum Stmt {
     Return(Exp),
     Assign { ident: String, exp: Exp },
+    Block(Block),
+    Exp(Exp),
 }
 
 #[derive(Debug)]

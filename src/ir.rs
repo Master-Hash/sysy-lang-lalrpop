@@ -328,11 +328,7 @@ impl Block {
                             for const_def in const_def {
                                 let value: i32 =
                                     traverse_const_exp(&const_def.const_exp.0, cascade_table);
-                                cascade_table
-                                    .0
-                                    .last_mut()
-                                    .unwrap()
-                                    .insert(const_def.ident.clone(), Sym::Const { value });
+                                cascade_table.insert(const_def.ident.clone(), Sym::Const { value });
                             }
                         }
                     },
@@ -348,9 +344,6 @@ impl Block {
                                     res.push(s);
                                 }
                                 cascade_table
-                                    .0
-                                    .last_mut()
-                                    .unwrap()
                                     .insert(var_def.ident.clone(), Sym::Variable { value: store });
                             }
                         }

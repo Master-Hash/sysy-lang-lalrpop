@@ -299,9 +299,14 @@ impl Block {
             match item {
                 BlockItem::Stmt(stmt) => match stmt {
                     Stmt::Return(exp) => {
-                        let to_return = traverse_exp(exp, main_data, &mut res, cascade_table);
-                        let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
-                        res.push(ret);
+                        if let Some(exp) = exp {
+                            let to_return = traverse_exp(exp, main_data, &mut res, cascade_table);
+                            let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
+                            res.push(ret);
+                        } else {
+                            let ret = main_data.dfg_mut().new_value().ret(None);
+                            res.push(ret);
+                        }
                     }
                     Stmt::Assign { ident, exp } => {
                         let sym = cascade_table.get(ident).clone();
@@ -315,7 +320,9 @@ impl Block {
                         }
                     }
                     Stmt::Exp(_exp) => {
-                        let v = traverse_exp(_exp, main_data, &mut res, cascade_table);
+                        if let Some(exp) = _exp {
+                            let _v = traverse_exp(exp, main_data, &mut res, cascade_table);
+                        }
                     }
                     Stmt::Block(block) => {
                         let block_res = block.new_ir(main_data, cascade_table);

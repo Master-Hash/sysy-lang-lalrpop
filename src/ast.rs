@@ -34,10 +34,10 @@ pub enum BlockItem {
 // 这玩意是时候改名叫 Return Stmt 了
 #[derive(Debug)]
 pub enum Stmt {
-    Return(Exp),
+    Return(Option<Exp>),
     Assign { ident: String, exp: Exp },
     Block(Block),
-    Exp(Exp),
+    Exp(Option<Exp>),
 }
 
 #[derive(Debug)]

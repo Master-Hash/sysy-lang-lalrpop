@@ -70,13 +70,13 @@ VariableDef: VarDef = {
 }
 
 Stmt: Stmt = {
-  "return" <exp: Exp> ";" => Stmt::Return(<>),
+  "return" <exp: Exp?> ";" => Stmt::Return(<>),
   <lval: LVal> "=" <exp: Exp> ";" => Stmt::Assign {
     ident: lval,
     exp: exp,
   },
   <block: Block> => Stmt::Block(<>),
-  <exp: Exp> ";" => Stmt::Exp(<>),
+  <exp: Exp?> ";" => Stmt::Exp(<>),
 }
 
 LVal: String = <ident: Ident> => ident;

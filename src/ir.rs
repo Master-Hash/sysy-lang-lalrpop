@@ -309,12 +309,12 @@ impl Block {
                         }
                     }
                     Stmt::Assign { ident, exp } => {
-                        let sym = cascade_table.get(ident).clone();
+                        let sym = cascade_table.get(ident);
                         match sym {
                             Sym::Const { value: _ } => panic!("Can't assign to const"),
                             Sym::Variable { value } => {
                                 let v = traverse_exp(exp, main_data, &mut res, cascade_table);
-                                let s = main_data.dfg_mut().new_value().store(v, value);
+                                let s = main_data.dfg_mut().new_value().store(v, *value);
                                 res.push(s);
                             }
                         }

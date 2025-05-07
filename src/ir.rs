@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::{Rc, Weak};
 
 use crate::ast::{BType, Block, BlockItem, CompUnit, Decl, Exp, FuncType, Stmt};
 use koopa::ir::builder_traits::*;
@@ -328,6 +327,11 @@ impl Block {
                         let block_res = block.new_ir(main_data, cascade_table);
                         res.extend(block_res);
                     }
+                    Stmt::If {
+                        cond,
+                        then_stmt,
+                        else_stmt,
+                    } => todo!(),
                 },
                 BlockItem::Decl(decl) => match decl {
                     Decl::ConstDecl { b_type, const_def } => match b_type {

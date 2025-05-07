@@ -35,9 +35,17 @@ pub enum BlockItem {
 #[derive(Debug)]
 pub enum Stmt {
     Return(Option<Exp>),
-    Assign { ident: String, exp: Exp },
+    Assign {
+        ident: String,
+        exp: Exp,
+    },
     Block(Block),
     Exp(Option<Exp>),
+    If {
+        cond: Exp,
+        then_stmt: Box<Stmt>,
+        else_stmt: Option<Box<Stmt>>,
+    },
 }
 
 #[derive(Debug)]

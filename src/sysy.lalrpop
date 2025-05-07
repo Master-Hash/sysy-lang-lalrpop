@@ -70,6 +70,36 @@ VariableDef: VarDef = {
 }
 
 Stmt: Stmt = {
+  // 假设未来还要支持 while，另说
+  <then_stmt: OpenStmt> => then_stmt,
+  <closed_stmt: ClosedStmt> => closed_stmt,
+  // "if" "(" <exp:Exp> ")" <if_stmt: Stmt> <else_stmt:("else" <Stmt>)?> => Stmt::If {
+  //   exp: exp,
+  //   if_stmt: if_stmt,
+  //   else_stmt: else_stmt,
+  // },
+}
+
+OpenStmt: Stmt = {
+  "if" "(" <exp: Exp> ")" <stmt: Stmt> => Stmt::If {
+    cond: exp,
+    then_stmt: Box::new(stmt),
+    else_stmt: None,
+  },
+  "if" "(" <exp: Exp> ")" <then_stmt: ClosedStmt> "else" <else_stmt: OpenStmt> => Stmt::If {
+    cond: exp,
+    then_stmt: Box::new(then_stmt),
+    else_stmt: Some(Box::new(else_stmt)),
+  },
+}
+
+ClosedStmt: Stmt = {
+  "if" "(" <cond: Exp> ")" <then_stmt: ClosedStmt> "else" <else_stmt: ClosedStmt> => Stmt::If {
+    cond: cond,
+    then_stmt: Box::new(then_stmt),
+    else_stmt: Some(Box::new(else_stmt)),
+  },
+  // other stmt
   "return" <exp: Exp?> ";" => Stmt::Return(<>),
   <lval: LVal> "=" <exp: Exp> ";" => Stmt::Assign {
     ident: lval,

@@ -1,10 +1,12 @@
 use std::collections::HashMap;
+use std::thread::current;
 
 use crate::ast::{BType, Block, BlockItem, CompUnit, Decl, Exp, FuncType, Stmt};
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
 
 impl Exp {
+    // 这玩意，我认为不用改
     pub fn traverse_const_exp(&self, sym_table: &CascadeTable) -> i32 {
         let exp = self;
         match exp {
@@ -96,31 +98,56 @@ impl Exp {
 
     fn traverse_exp(
         &self,
-        function_data: &mut FunctionData,
-        res: &mut Vec<Value>,
-        sym_table: &CascadeTable,
+        // function_data: &mut FunctionData,
+        // res: &mut Vec<Value>,
+        // sym_table: &CascadeTable,
+        context: &mut IRContext,
     ) -> Value {
+        let sym_table = &mut context.current_cascade_table;
+        let mut res = vec![];
         let exp = self;
-        let zero = function_data.dfg_mut().new_value().integer(0);
-        match exp {
-            Exp::Number(num) => function_data.dfg_mut().new_value().integer(*num),
+        let zero = context
+            .current_program
+            .func_mut(context.current_func)
+            .dfg_mut()
+            .new_value()
+            .integer(0);
+        let v = match exp {
+            Exp::Number(num) => context
+                .current_program
+                .func_mut(context.current_func)
+                .dfg_mut()
+                .new_value()
+                .integer(*num),
             Exp::LVal(ident) => {
                 let sym = sym_table.get(ident);
                 match sym {
-                    Sym::Const { value } => function_data.dfg_mut().new_value().integer(*value),
+                    Sym::Const { value } => context
+                        .current_program
+                        .func_mut(context.current_func)
+                        .dfg_mut()
+                        .new_value()
+                        .integer(*value),
                     Sym::Variable { value } => {
-                        let l = function_data.dfg_mut().new_value().load(*value);
+                        let l = context
+                            .current_program
+                            .func_mut(context.current_func)
+                            .dfg_mut()
+                            .new_value()
+                            .load(*value);
                         res.push(l);
                         l
                     }
                 }
-                // function_data.dfg_mut().new_value().integer(sym.value)
+                // context.current_program.func_mut(context.current_func).dfg_mut().new_value().integer(sym.value)
             }
-            Exp::Paren(exp) => exp.traverse_exp(function_data, res, sym_table),
-            Exp::PlusUnary(exp) => exp.traverse_exp(function_data, res, sym_table),
+            Exp::Paren(exp) => exp.traverse_exp(context),
+            Exp::PlusUnary(exp) => exp.traverse_exp(context),
             Exp::MinusUnary(exp) => {
-                let lhs = exp.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = exp.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Sub, zero, lhs);
@@ -128,8 +155,10 @@ impl Exp {
                 r
             }
             Exp::NotUnary(exp) => {
-                let lhs = exp.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = exp.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Eq, lhs, zero);
@@ -137,9 +166,11 @@ impl Exp {
                 r
             }
             Exp::MulBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Mul, lhs, rhs);
@@ -147,9 +178,11 @@ impl Exp {
                 r
             }
             Exp::DivBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Div, lhs, rhs);
@@ -157,9 +190,11 @@ impl Exp {
                 r
             }
             Exp::ModBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Mod, lhs, rhs);
@@ -167,9 +202,11 @@ impl Exp {
                 r
             }
             Exp::AddBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Add, lhs, rhs);
@@ -177,9 +214,11 @@ impl Exp {
                 r
             }
             Exp::SubBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Sub, lhs, rhs);
@@ -187,9 +226,11 @@ impl Exp {
                 r
             }
             Exp::LTBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Lt, lhs, rhs);
@@ -197,9 +238,11 @@ impl Exp {
                 r
             }
             Exp::LEBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Le, lhs, rhs);
@@ -207,9 +250,11 @@ impl Exp {
                 r
             }
             Exp::GTBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Gt, lhs, rhs);
@@ -217,9 +262,11 @@ impl Exp {
                 r
             }
             Exp::GEBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Ge, lhs, rhs);
@@ -227,9 +274,11 @@ impl Exp {
                 r
             }
             Exp::EqBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::Eq, lhs, rhs);
@@ -237,9 +286,11 @@ impl Exp {
                 r
             }
             Exp::NeBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::NotEq, lhs, rhs);
@@ -248,19 +299,23 @@ impl Exp {
             }
             // todo 短路
             Exp::LAndBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let bit_lhs =
-                    function_data
-                        .dfg_mut()
-                        .new_value()
-                        .binary(BinaryOp::NotEq, lhs, zero);
-                let bit_rhs =
-                    function_data
-                        .dfg_mut()
-                        .new_value()
-                        .binary(BinaryOp::NotEq, rhs, zero);
-                let r = function_data
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let bit_lhs = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .binary(BinaryOp::NotEq, lhs, zero);
+                let bit_rhs = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .binary(BinaryOp::NotEq, rhs, zero);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::And, bit_lhs, bit_rhs);
@@ -271,83 +326,211 @@ impl Exp {
             }
             // todo 短路
             Exp::LOrBinary(lhs, rhs) => {
-                let lhs = lhs.traverse_exp(function_data, res, sym_table);
-                let rhs = rhs.traverse_exp(function_data, res, sym_table);
-                let bit_or_value =
-                    function_data
-                        .dfg_mut()
-                        .new_value()
-                        .binary(BinaryOp::Or, lhs, rhs);
-                let r =
-                    function_data
-                        .dfg_mut()
-                        .new_value()
-                        .binary(BinaryOp::NotEq, bit_or_value, zero);
+                let lhs = lhs.traverse_exp(context);
+                let rhs = rhs.traverse_exp(context);
+                let bit_or_value = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .binary(BinaryOp::Or, lhs, rhs);
+                let r = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .binary(BinaryOp::NotEq, bit_or_value, zero);
                 res.push(bit_or_value);
                 res.push(r);
                 r
             }
+        };
+        context
+            .current_program
+            .func_mut(context.current_func)
+            .layout_mut()
+            .bb_mut(context.current_bblock)
+            .insts_mut()
+            .extend(res);
+        v
+    }
+}
+
+impl Stmt {
+    fn new_ir(&self, context: &mut IRContext) {
+        // let main_data = function_data;
+        match self {
+            Stmt::Return(exp) => {
+                let mut res: Vec<Value> = vec![];
+                if let Some(exp) = exp {
+                    let to_return = exp.traverse_exp(context);
+                    let ret = context
+                        .current_program
+                        .func_mut(context.current_func)
+                        .dfg_mut()
+                        .new_value()
+                        .ret(Some(to_return));
+                    res.push(ret);
+                } else {
+                    let ret = context
+                        .current_program
+                        .func_mut(context.current_func)
+                        .dfg_mut()
+                        .new_value()
+                        .ret(None);
+                    res.push(ret);
+                }
+                context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .extend(res);
+            }
+            Stmt::Assign { ident, exp } => {
+                // rust 没有什么好办法标记可变借用的结构体部分字段不可变
+                // 无奈
+                let mut res: Vec<Value> = vec![];
+                let sym = context.current_cascade_table.get(ident).clone();
+                match sym {
+                    Sym::Const { value: _ } => panic!("Can't assign to const"),
+                    Sym::Variable { value } => {
+                        let v = exp.traverse_exp(context);
+                        let s = context
+                            .current_program
+                            .func_mut(context.current_func)
+                            .dfg_mut()
+                            .new_value()
+                            .store(v, value);
+                        res.push(s);
+                    }
+                }
+                context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .extend(res);
+            }
+            Stmt::Exp(_exp) => {
+                if let Some(exp) = _exp {
+                    let _v = exp.traverse_exp(context);
+                }
+            }
+            Stmt::Block(block) => {
+                block.new_ir(context);
+                // res.extend(block_res);
+            }
+            Stmt::If {
+                cond,
+                then_stmt,
+                else_stmt,
+            } => {
+                let cond = cond.traverse_exp(context);
+                let then_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block(None);
+                let else_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block(None);
+                let end_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block(None);
+
+                context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bbs_mut()
+                    .extend([then_bb, else_bb, end_bb]);
+
+                let cond_inst = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .branch(cond, then_bb, else_bb);
+                let jump_end_inst = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .jump(end_bb);
+
+                let _ = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .push_key_back(cond_inst);
+
+                context.current_bblock = then_bb;
+                then_stmt.new_ir(context);
+                let _ = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .push_key_back(jump_end_inst);
+
+                context.current_bblock = else_bb;
+                if let Some(e) = else_stmt {
+                    e.new_ir(context);
+                }
+                let _ = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .push_key_back(jump_end_inst);
+
+                context.current_bblock = end_bb;
+            }
         }
+
+        // res
     }
 }
 
 impl Block {
     pub fn new_ir(
         &self,
-        function_data: &mut FunctionData,
-        cascade_table: &mut CascadeTable,
-    ) -> Vec<Value> {
-        let mut res: Vec<Value> = Vec::new();
-        cascade_table.indent();
+        // function_data: &mut FunctionData,
+        // cascade_table: &mut CascadeTable,
+        context: &mut IRContext,
+    ) {
+        // let mut res: Vec<Value> = vec![];
+        context.current_cascade_table.indent();
         // let mut sym_table = cascade_table.0.last_mut().unwrap();
-        let main_data = function_data;
 
         for item in &self.items {
             match item {
-                BlockItem::Stmt(stmt) => match stmt {
-                    Stmt::Return(exp) => {
-                        if let Some(exp) = exp {
-                            let to_return = exp.traverse_exp(main_data, &mut res, cascade_table);
-                            let ret = main_data.dfg_mut().new_value().ret(Some(to_return));
-                            res.push(ret);
-                        } else {
-                            let ret = main_data.dfg_mut().new_value().ret(None);
-                            res.push(ret);
-                        }
-                    }
-                    Stmt::Assign { ident, exp } => {
-                        let sym = cascade_table.get(ident);
-                        match sym {
-                            Sym::Const { value: _ } => panic!("Can't assign to const"),
-                            Sym::Variable { value } => {
-                                let v = exp.traverse_exp(main_data, &mut res, cascade_table);
-                                let s = main_data.dfg_mut().new_value().store(v, *value);
-                                res.push(s);
-                            }
-                        }
-                    }
-                    Stmt::Exp(_exp) => {
-                        if let Some(exp) = _exp {
-                            let _v = exp.traverse_exp(main_data, &mut res, cascade_table);
-                        }
-                    }
-                    Stmt::Block(block) => {
-                        let block_res = block.new_ir(main_data, cascade_table);
-                        res.extend(block_res);
-                    }
-                    Stmt::If {
-                        cond,
-                        then_stmt,
-                        else_stmt,
-                    } => todo!(),
-                },
+                BlockItem::Stmt(stmt) => stmt.new_ir(context),
                 BlockItem::Decl(decl) => match decl {
                     Decl::ConstDecl { b_type, const_def } => match b_type {
                         BType::Int => {
                             for const_def in const_def {
-                                let value: i32 =
-                                    const_def.const_exp.0.traverse_const_exp(cascade_table);
-                                cascade_table.insert(const_def.ident.clone(), Sym::Const { value });
+                                let value: i32 = const_def
+                                    .const_exp
+                                    .0
+                                    .traverse_const_exp(&context.current_cascade_table);
+                                context
+                                    .current_cascade_table
+                                    .insert(const_def.ident.clone(), Sym::Const { value });
                             }
                         }
                     },
@@ -355,24 +538,63 @@ impl Block {
                         BType::Int => {
                             for var_def in var_def {
                                 // let sym_table = cascade_table.0.last_mut().unwrap();
-                                let store = main_data.dfg_mut().new_value().alloc(Type::get_i32());
-                                res.push(store);
+                                let allocation = context
+                                    .current_program
+                                    .func_mut(context.current_func)
+                                    .dfg_mut()
+                                    .new_value()
+                                    .alloc(Type::get_i32());
+                                // res.push(allocation);
+                                let _ = context
+                                    .current_program
+                                    .func_mut(context.current_func)
+                                    .layout_mut()
+                                    .bb_mut(context.current_bblock)
+                                    .insts_mut()
+                                    .push_key_back(allocation);
                                 if let Some(exp) = &var_def.exp {
-                                    let v = exp.traverse_exp(main_data, &mut res, cascade_table);
-                                    let s = main_data.dfg_mut().new_value().store(v, store);
-                                    res.push(s);
+                                    let v = exp.traverse_exp(context);
+                                    let s = context
+                                        .current_program
+                                        .func_mut(context.current_func)
+                                        .dfg_mut()
+                                        .new_value()
+                                        .store(v, allocation);
+                                    let _ = context
+                                        .current_program
+                                        .func_mut(context.current_func)
+                                        .layout_mut()
+                                        .bb_mut(context.current_bblock)
+                                        .insts_mut()
+                                        .push_key_back(s);
                                 }
-                                cascade_table
-                                    .insert(var_def.ident.clone(), Sym::Variable { value: store });
+                                context.current_cascade_table.insert(
+                                    var_def.ident.clone(),
+                                    Sym::Variable { value: allocation },
+                                );
                             }
                         }
                     },
                 },
             }
         }
-        cascade_table.pop();
-        res
+        context.current_cascade_table.pop();
+        // context
+        //     .current_program
+        //     .func_mut(context.current_func)
+        //     .layout_mut()
+        //     .bb_mut(context.current_bblock)
+        //     .insts_mut()
+        //     .extend(res);
     }
+}
+
+// #[derive(Debug)]
+pub struct IRContext {
+    pub current_program: Program,
+    pub current_func: Function,
+    pub current_bblock: BasicBlock,
+    pub current_cascade_table: CascadeTable,
 }
 
 // https://docs.rs/koopa/latest/koopa/ir/
@@ -395,12 +617,18 @@ impl CompUnit {
         main_data.layout_mut().bbs_mut().extend([entry]);
 
         let block = &self.func_def.block;
-        let mut cadcade_table = CascadeTable::new();
+        let cadcade_table = CascadeTable::new();
 
-        let res = block.new_ir(main_data, &mut cadcade_table);
+        let mut context = IRContext {
+            current_program: program,
+            current_func: m,
+            current_bblock: entry,
+            current_cascade_table: cadcade_table,
+        };
+        block.new_ir(&mut context);
 
-        main_data.layout_mut().bb_mut(entry).insts_mut().extend(res);
-        program
+        // main_data.layout_mut().bb_mut(entry).insts_mut().extend(res);
+        context.current_program
     }
 }
 

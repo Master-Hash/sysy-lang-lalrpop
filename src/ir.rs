@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::thread::current;
 
 use crate::ast::{BType, Block, BlockItem, CompUnit, Decl, Exp, FuncType, Stmt};
 use koopa::ir::builder_traits::*;
@@ -357,7 +356,7 @@ impl Exp {
 }
 
 impl Stmt {
-    fn new_ir(&self, context: &mut IRContext) {
+    fn new_ir(&self, context: &mut IRContext) -> IsReturn {
         // let main_data = function_data;
         match self {
             Stmt::Return(exp) => {
@@ -387,6 +386,7 @@ impl Stmt {
                     .bb_mut(context.current_bblock)
                     .insts_mut()
                     .extend(res);
+                return IsReturn::Yes;
             }
             Stmt::Assign { ident, exp } => {
                 // rust 没有什么好办法标记可变借用的结构体部分字段不可变
@@ -420,8 +420,7 @@ impl Stmt {
                 }
             }
             Stmt::Block(block) => {
-                block.new_ir(context);
-                // res.extend(block_res);
+                return block.new_ir(context);
             }
             Stmt::If {
                 cond,
@@ -477,31 +476,35 @@ impl Stmt {
                     .push_key_back(cond_inst);
 
                 context.current_bblock = then_bb;
-                then_stmt.new_ir(context);
-                let _ = context
-                    .current_program
-                    .func_mut(context.current_func)
-                    .layout_mut()
-                    .bb_mut(context.current_bblock)
-                    .insts_mut()
-                    .push_key_back(jump_end_inst);
+                let t = then_stmt.new_ir(context);
+                if let IsReturn::No = t {
+                    let _ = context
+                        .current_program
+                        .func_mut(context.current_func)
+                        .layout_mut()
+                        .bb_mut(context.current_bblock)
+                        .insts_mut()
+                        .push_key_back(jump_end_inst);
+                }
 
                 context.current_bblock = else_bb;
                 if let Some(e) = else_stmt {
-                    e.new_ir(context);
+                    let e = e.new_ir(context);
+                    if let IsReturn::No = e {
+                        let _ = context
+                            .current_program
+                            .func_mut(context.current_func)
+                            .layout_mut()
+                            .bb_mut(context.current_bblock)
+                            .insts_mut()
+                            .push_key_back(jump_end_inst);
+                    }
                 }
-                let _ = context
-                    .current_program
-                    .func_mut(context.current_func)
-                    .layout_mut()
-                    .bb_mut(context.current_bblock)
-                    .insts_mut()
-                    .push_key_back(jump_end_inst);
 
                 context.current_bblock = end_bb;
             }
         }
-
+        IsReturn::No
         // res
     }
 }
@@ -512,80 +515,81 @@ impl Block {
         // function_data: &mut FunctionData,
         // cascade_table: &mut CascadeTable,
         context: &mut IRContext,
-    ) {
-        // let mut res: Vec<Value> = vec![];
+    ) -> IsReturn {
         context.current_cascade_table.indent();
-        // let mut sym_table = cascade_table.0.last_mut().unwrap();
 
         for item in &self.items {
             match item {
-                BlockItem::Stmt(stmt) => stmt.new_ir(context),
-                BlockItem::Decl(decl) => match decl {
-                    Decl::ConstDecl { b_type, const_def } => match b_type {
-                        BType::Int => {
-                            for const_def in const_def {
-                                let value: i32 = const_def
-                                    .const_exp
-                                    .0
-                                    .traverse_const_exp(&context.current_cascade_table);
-                                context
-                                    .current_cascade_table
-                                    .insert(const_def.ident.clone(), Sym::Const { value });
+                BlockItem::Stmt(stmt) => {
+                    let x = stmt.new_ir(context);
+                    if let IsReturn::Yes = x {
+                        context.current_cascade_table.pop();
+                        return x;
+                    }
+                }
+                BlockItem::Decl(decl) => {
+                    match decl {
+                        Decl::ConstDecl { b_type, const_def } => match b_type {
+                            BType::Int => {
+                                for const_def in const_def {
+                                    let value: i32 = const_def
+                                        .const_exp
+                                        .0
+                                        .traverse_const_exp(&context.current_cascade_table);
+                                    context
+                                        .current_cascade_table
+                                        .insert(const_def.ident.clone(), Sym::Const { value });
+                                }
                             }
-                        }
-                    },
-                    Decl::VariableDecl { b_type, var_def } => match b_type {
-                        BType::Int => {
-                            for var_def in var_def {
-                                // let sym_table = cascade_table.0.last_mut().unwrap();
-                                let allocation = context
-                                    .current_program
-                                    .func_mut(context.current_func)
-                                    .dfg_mut()
-                                    .new_value()
-                                    .alloc(Type::get_i32());
-                                // res.push(allocation);
-                                let _ = context
-                                    .current_program
-                                    .func_mut(context.current_func)
-                                    .layout_mut()
-                                    .bb_mut(context.current_bblock)
-                                    .insts_mut()
-                                    .push_key_back(allocation);
-                                if let Some(exp) = &var_def.exp {
-                                    let v = exp.traverse_exp(context);
-                                    let s = context
+                        },
+                        Decl::VariableDecl { b_type, var_def } => match b_type {
+                            BType::Int => {
+                                for var_def in var_def {
+                                    // let sym_table = cascade_table.0.last_mut().unwrap();
+                                    let allocation = context
                                         .current_program
                                         .func_mut(context.current_func)
                                         .dfg_mut()
                                         .new_value()
-                                        .store(v, allocation);
+                                        .alloc(Type::get_i32());
+                                    // res.push(allocation);
                                     let _ = context
                                         .current_program
                                         .func_mut(context.current_func)
                                         .layout_mut()
                                         .bb_mut(context.current_bblock)
                                         .insts_mut()
-                                        .push_key_back(s);
+                                        .push_key_back(allocation);
+                                    if let Some(exp) = &var_def.exp {
+                                        let v = exp.traverse_exp(context);
+                                        let s = context
+                                            .current_program
+                                            .func_mut(context.current_func)
+                                            .dfg_mut()
+                                            .new_value()
+                                            .store(v, allocation);
+                                        let _ = context
+                                            .current_program
+                                            .func_mut(context.current_func)
+                                            .layout_mut()
+                                            .bb_mut(context.current_bblock)
+                                            .insts_mut()
+                                            .push_key_back(s);
+                                    }
+                                    context.current_cascade_table.insert(
+                                        var_def.ident.clone(),
+                                        Sym::Variable { value: allocation },
+                                    );
                                 }
-                                context.current_cascade_table.insert(
-                                    var_def.ident.clone(),
-                                    Sym::Variable { value: allocation },
-                                );
                             }
-                        }
-                    },
-                },
+                        },
+                    }
+                }
             }
         }
+        // todo!();
         context.current_cascade_table.pop();
-        // context
-        //     .current_program
-        //     .func_mut(context.current_func)
-        //     .layout_mut()
-        //     .bb_mut(context.current_bblock)
-        //     .insts_mut()
-        //     .extend(res);
+        IsReturn::No
     }
 }
 
@@ -636,6 +640,11 @@ impl CompUnit {
 enum Sym {
     Const { value: i32 },
     Variable { value: Value },
+}
+
+pub enum IsReturn {
+    Yes,
+    No,
 }
 
 pub struct CascadeTable(Vec<HashMap<String, Sym>>);

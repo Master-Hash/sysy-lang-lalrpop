@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{BType, Block, BlockItem, CompUnit, Decl, Exp, FuncType, Stmt};
+use koopa::ir::builder::EntityInfoQuerier;
 use koopa::ir::builder_traits::*;
 use koopa::ir::*;
 
@@ -296,51 +297,218 @@ impl Exp {
                 res.push(r);
                 r
             }
-            // todo 短路
+            // 如果希望返回单个返回值，alloc 或者 基本块参数择一使用很有必要
+            // 我选择玩玩基本块参数
             Exp::LAndBinary(lhs, rhs) => {
                 let lhs = lhs.traverse_exp(context);
-                let rhs = rhs.traverse_exp(context);
-                let bit_lhs = context
+                let then_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block(None);
+                let else_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block(None);
+                let end_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block_with_params(None, vec![Type::get_i32()]);
+                context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bbs_mut()
+                    .extend([then_bb, else_bb, end_bb]);
+                let br_inst = context
                     .current_program
                     .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
-                    .binary(BinaryOp::NotEq, lhs, zero);
+                    .branch(lhs, then_bb, else_bb);
+                let _ = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .push_key_back(br_inst);
+
+                context.current_bblock = then_bb;
+                // 这是一堆指令，这里直接遍历，但实际跳转到才会执行
+                let rhs = rhs.traverse_exp(context);
                 let bit_rhs = context
                     .current_program
                     .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
                     .binary(BinaryOp::NotEq, rhs, zero);
-                let r = context
+
+                let then_jump = context
                     .current_program
                     .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
-                    .binary(BinaryOp::And, bit_lhs, bit_rhs);
-                res.push(bit_lhs);
-                res.push(bit_rhs);
-                res.push(r);
+                    .jump_with_args(end_bb, vec![bit_rhs]);
+
+                context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .extend([bit_rhs, then_jump]);
+
+                context.current_bblock = else_bb;
+                let else_jump = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .jump_with_args(end_bb, vec![zero]);
+
+                let _ = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(else_bb)
+                    .insts_mut()
+                    .push_key_back(else_jump);
+
+                context.current_bblock = end_bb;
+                let r = *context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .bb_params(end_bb)
+                    .first()
+                    .unwrap();
+                // context.current_program
+                // context.current_program
+                // let bit_lhs = context
+                //     .current_program
+                //     .func_mut(context.current_func)
+                //     .dfg_mut()
+                //     .new_value()
+                //     .binary(BinaryOp::NotEq, lhs, zero);
+                // res.push(p);
+                // res.push(r);
                 r
             }
             // todo 短路
             Exp::LOrBinary(lhs, rhs) => {
                 let lhs = lhs.traverse_exp(context);
+                let then_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block(None);
+                let else_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block(None);
+                let end_bb = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_bb()
+                    .basic_block_with_params(None, vec![Type::get_i32()]);
+                context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bbs_mut()
+                    .extend([then_bb, else_bb, end_bb]);
+                let br_inst = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .branch(lhs, then_bb, else_bb);
+                let _ = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .push_key_back(br_inst);
+
+                context.current_bblock = then_bb;
+                let one = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .integer(1);
+                let then_jump = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .jump_with_args(end_bb, vec![one]);
+                let _ = context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(then_bb)
+                    .insts_mut()
+                    .push_key_back(then_jump);
+
+                context.current_bblock = else_bb;
                 let rhs = rhs.traverse_exp(context);
-                let bit_or_value = context
+                let bit_rhs = context
                     .current_program
                     .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
-                    .binary(BinaryOp::Or, lhs, rhs);
-                let r = context
+                    .binary(BinaryOp::NotEq, rhs, zero);
+                let else_jump = context
                     .current_program
                     .func_mut(context.current_func)
                     .dfg_mut()
                     .new_value()
-                    .binary(BinaryOp::NotEq, bit_or_value, zero);
-                res.push(bit_or_value);
-                res.push(r);
+                    .jump_with_args(end_bb, vec![bit_rhs]);
+                context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .layout_mut()
+                    .bb_mut(context.current_bblock)
+                    .insts_mut()
+                    .extend([bit_rhs, else_jump]);
+
+                context.current_bblock = end_bb;
+                let r = *context
+                    .current_program
+                    .func_mut(context.current_func)
+                    .dfg_mut()
+                    .new_value()
+                    .bb_params(end_bb)
+                    .first()
+                    .unwrap();
+
+                // let bit_or_value = context
+                //     .current_program
+                //     .func_mut(context.current_func)
+                //     .dfg_mut()
+                //     .new_value()
+                //     .binary(BinaryOp::Or, lhs, rhs);
+                // let r = context
+                //     .current_program
+                //     .func_mut(context.current_func)
+                //     .dfg_mut()
+                //     .new_value()
+                //     .binary(BinaryOp::NotEq, bit_or_value, zero);
+                // res.push(bit_or_value);
+                // res.push(r);
                 r
             }
         };

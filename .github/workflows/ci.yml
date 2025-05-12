@@ -9,7 +9,7 @@ jobs:
       max-parallel: 1
       matrix:
         target: [koopa, riscv]
-        level: [lv5, lv4, lv3, lv1]
+        level: [lv6, lv5, lv4, lv3, lv1]
         exclude:
           - target: riscv
             level: lv3
@@ -17,6 +17,8 @@ jobs:
             level: lv4
           - target: riscv
             level: lv5
+          - target: riscv
+            level: lv6
     container:
       image: ghcr.io/master-hash/compiler-dev
     steps:

@@ -656,19 +656,22 @@ impl Stmt {
                 }
 
                 context.current_bblock = else_bb;
-                if let Some(e) = else_stmt {
-                    let e = e.new_ir(context);
-                    if let IsReturn::No = e {
-                        let _ = context
-                            .current_program
-                            .func_mut(context.current_func)
-                            .layout_mut()
-                            .bb_mut(context.current_bblock)
-                            .insts_mut()
-                            .push_key_back(jump_end_inst);
+                let e = {
+                    if let Some(ee) = else_stmt {
+                        ee.new_ir(context)
+                    } else {
+                        IsReturn::No
                     }
+                };
+                if let IsReturn::No = e {
+                    let _ = context
+                        .current_program
+                        .func_mut(context.current_func)
+                        .layout_mut()
+                        .bb_mut(context.current_bblock)
+                        .insts_mut()
+                        .push_key_back(jump_end_inst);
                 }
-
                 context.current_bblock = end_bb;
             }
         }
